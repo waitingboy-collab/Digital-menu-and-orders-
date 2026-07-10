@@ -81,9 +81,14 @@ function renderMenu() {
         const hasStock = item.quantity !== null && item.quantity !== undefined;
         const lowStock = hasStock && item.quantity > 0 && item.quantity <= 3;
         const stockNote = lowStock ? `<p class="text-xs text-orange-500 font-bold mt-1">Остават: ${item.quantity} бр.</p>` : '';
+        const isPopular = popularItemNames.has(item.name);
+        const popularBadge = isPopular
+            ? `<span class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">🔥 Популярно</span>`
+            : '';
 
         return `
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer relative" data-open-item="${item.id}">
+            ${popularBadge}
             ${item.image_url ? `
             <img src="${item.image_url}" alt="${item.name || ''}"
                  class="w-full h-40 object-cover rounded-lg mb-3"
@@ -321,6 +326,22 @@ async function submitOrder() {
     }
 }
 
+let popularItemNames = new Set();
+
+// Взема имената на топ продаваните артикули (по всички завършени поръчки) за баджа "Популярно"
+async function loadPopularItems() {
+    try {
+        const { data, error } = await supabaseClient.rpc("get_top_selling_items", { item_limit: 5 });
+        if (error) {
+            console.error("Грешка при зареждане на популярните артикули:", error.message);
+            return;
+        }
+        popularItemNames = new Set((data || []).map(row => row.name));
+    } catch (e) {
+        console.error("Критична грешка при популярните артикули:", e);
+    }
+}
+
 // Зарежда/презарежда само артикулите (без да пипа event listeners) - използва се и за опресняване след поръчка
 async function refreshMenuItems() {
     const { data, error } = await supabaseClient
@@ -428,6 +449,7 @@ async function loadMenu() {
         }
 
         // 2. Вземане на менюто (само наличните и с ненулева наличност)
+        await loadPopularItems();
         await refreshMenuItems();
     } catch (e) {
         console.error("Критична грешка:", e);
